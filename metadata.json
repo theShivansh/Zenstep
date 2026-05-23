@@ -1,0 +1,8 @@
+{
+  "name": "ZenStep",
+  "description": "A Neo-Brutalist productivity tool that uses AI to break down messy rooms into actionable micro-steps.",
+  "requestFramePermissions": [
+    "camera"
+  ],
+  "majorCapabilities": []
+}
