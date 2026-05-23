@@ -152,7 +152,40 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   } catch (err: any) {
     console.error("[/api/analyze] Error:", err);
     return res
-      .status(500)
-      .json({ error: err.message || "Internal server error." });
+      .status(geminiHttpStatus(err))
+      .json({ error: geminiErrorMessage(err) });
   }
+}
+
+// ── Gemini error helpers ──────────────────────────────────────────────────────
+function geminiHttpStatus(err: any): number {
+  try {
+    const body = typeof err.message === 'string' ? JSON.parse(err.message) : err;
+    const code = body?.error?.code ?? body?.code;
+    if (code === 429) return 429;
+    if (code === 400) return 400;
+    if (code === 403) return 403;
+  } catch {}
+  return 500;
+}
+
+function geminiErrorMessage(err: any): string {
+  try {
+    const body = typeof err.message === 'string' ? JSON.parse(err.message) : err;
+    const code = body?.error?.code ?? body?.code;
+    const status = body?.error?.status ?? '';
+
+    if (code === 429 || status === 'RESOURCE_EXHAUSTED') {
+      return '⚠️ Gemini API quota exceeded. Your free-tier limit has been reached. Please enable billing on your Google AI project at https://aistudio.google.com — paid tier is very cheap (\$0.10 per image).';
+    }
+    if (code === 403) {
+      return '🔑 Invalid or missing Gemini API key. Check your GEMINI_API_KEY environment variable in the Vercel dashboard.';
+    }
+    if (code === 400) {
+      return '❌ Bad request sent to Gemini (unsupported file type or corrupted image). Please try a different photo.';
+    }
+    const msg = body?.error?.message;
+    if (msg) return msg;
+  } catch {}
+  return err.message || 'Internal server error.';
 }
