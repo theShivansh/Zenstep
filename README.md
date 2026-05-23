@@ -10,7 +10,7 @@
 
 **A cognitively-aware, gamified AI intervention system designed to break paralysis by analysis.**
 
-[View Live Demo](#) <!-- Add your Vercel URL here later -->
+[View Live Demo](https://zenstep-pi.vercel.app/) 
 
 </div>
 
