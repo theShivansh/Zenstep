@@ -206,30 +206,22 @@ const App: React.FC = () => {
               ref={fileInputRef} 
               onChange={handleFileChange} 
               className="hidden" 
-              accept="image/*,video/*"
+              accept="image/*"
             />
             
             {!file ? (
               <div className="space-y-6">
-                <div className="text-6xl filter grayscale hover:grayscale-0 transition-all">📸/🎥</div>
+                <div className="text-6xl filter grayscale hover:grayscale-0 transition-all">📸</div>
                 <h2 className="text-3xl md:text-4xl font-black uppercase tracking-tighter">SCAN THE CHAOS</h2>
-                <p className="font-bold text-sm tracking-widest">DRAG MEDIA (IMAGE/VIDEO) HERE OR CLICK TO UPLOAD</p>
+                <p className="font-bold text-sm tracking-widest">DRAG AN IMAGE HERE OR CLICK TO UPLOAD</p>
               </div>
             ) : (
               <div className="space-y-6">
-                 {file.type.startsWith('video/') ? (
-                   <video 
-                     controls
-                     src={URL.createObjectURL(file)} 
-                     className="max-h-64 w-full object-cover mx-auto border-4 border-[#00F0FF] shadow-[4px_4px_0px_0px_#FF003C]"
-                   />
-                 ) : (
-                   <img 
-                    src={URL.createObjectURL(file)} 
-                    alt="Preview" 
-                    className="max-h-64 mx-auto border-4 border-[#00F0FF] shadow-[4px_4px_0px_0px_#FF003C]"
-                   />
-                 )}
+                 <img 
+                   src={URL.createObjectURL(file)} 
+                   alt="Preview" 
+                   className="max-h-64 mx-auto border-4 border-[#00F0FF] shadow-[4px_4px_0px_0px_#FF003C]"
+                  />
                 
                 {/* Time Selection */}
                 <div className="bg-[#111] border-2 border-[#333] p-4 text-left" onClick={(e) => e.stopPropagation()}>

@@ -31,9 +31,9 @@ export const ChatBot: React.FC = () => {
     setLoading(true);
 
     try {
-      // Convert to Gemini format history
+      // Convert to Groq-compatible history (Groq uses 'assistant' not 'model')
       const history = messages.map(m => ({
-        role: m.role,
+        role: m.role === 'model' ? 'assistant' : 'user',
         parts: [{ text: m.text }]
       }));
 
