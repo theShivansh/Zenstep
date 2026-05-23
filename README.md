@@ -91,6 +91,5 @@ ZenStep is heavily optimized for seamless Vercel deployment.
 ---
 
 <div align="center">
-  <i>"Visual noise neutralized. Moving to the next sector."</i><br>
   <b>Built by <a href="https://github.com/theShivansh">Shivansh</a></b>
 </div>
