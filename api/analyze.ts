@@ -85,7 +85,15 @@ YOUR CORE LOGIC:
    - You MUST output strict JSON adhering to the provided schema.
 `;
 
-// Vercel's default body parser handles JSON/urlencoded but NOT multipart.
+// Increase Vercel's default 1MB body limit — base64 images can be several MB.
+export const config = {
+  api: {
+    bodyParser: {
+      sizeLimit: '10mb',
+    },
+  },
+};
+
 // We receive the image as a base64 string + mimeType from the client.
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (req.method !== "POST") {
