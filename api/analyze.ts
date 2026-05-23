@@ -1,61 +1,17 @@
 import type { VercelRequest, VercelResponse } from "@vercel/node";
-import { GoogleGenAI, Type } from "@google/genai";
+import Groq from "groq-sdk";
 
-// ── Schema (duplicated here so the API route is self-contained) ──────────────
-const ZenStepSchema = {
-  type: Type.OBJECT,
-  properties: {
-    vibe_summary: {
-      type: Type.STRING,
-      description:
-        "A bold, 2-4 word punchy headline summarizing the energy of the mess.",
-    },
-    deep_think_log: {
-      type: Type.STRING,
-      description:
-        "Internal psychological analysis of why the user is overwhelmed and how you determined the starting point.",
-    },
-    encouragement_phrase: {
-      type: Type.STRING,
-      description:
-        "A short, powerful, slightly robotic but encouraging phrase for when the assistant is unlocked.",
-    },
-    micro_steps: {
-      type: Type.ARRAY,
-      description: "A list of 5 to 10 actionable micro-steps.",
-      items: {
-        type: Type.OBJECT,
-        properties: {
-          emoji: { type: Type.STRING },
-          action_verb: { type: Type.STRING },
-          time_estimate: { type: Type.STRING },
-          reason: { type: Type.STRING },
-          completion_phrase: { type: Type.STRING },
-          speech_cue: {
-            type: Type.STRING,
-            enum: ["urgent", "calm", "robotic", "cheerful"],
-          },
-        },
-        required: [
-          "emoji",
-          "action_verb",
-          "time_estimate",
-          "reason",
-          "completion_phrase",
-          "speech_cue",
-        ],
-      },
+// Increase Vercel's default 1MB body limit — base64 images can be several MB.
+export const config = {
+  api: {
+    bodyParser: {
+      sizeLimit: "10mb",
     },
   },
-  required: [
-    "vibe_summary",
-    "deep_think_log",
-    "encouragement_phrase",
-    "micro_steps",
-  ],
 };
 
-const SYSTEM_INSTRUCTION = `
+// ── System prompt ─────────────────────────────────────────────────────────────
+const SYSTEM_PROMPT = `
 You are an expert Productivity Psychologist and Computer Vision analyst.
 
 INPUT DATA:
@@ -63,48 +19,49 @@ INPUT DATA:
 2. User's available time commitment (e.g. 2 mins, 10 mins, 30 mins).
 
 YOUR CORE LOGIC:
-1. **Analyze Complexity & Stress:** 
+1. **Analyze Complexity & Stress:**
    - High Clutter/Chaos? -> Break tasks into tiny, soothing micro-steps.
    - Low Clutter/High Confidence? -> Use fewer, bold "Power Mode" steps.
 
 2. **Determine Step Count based on Time & Complexity:**
-   - **Small Task / Short Time (< 5 mins):** Generate **5-7** rapid-fire micro-steps. Focus on immediate visual impact.
+   - **Small Task / Short Time (< 5 mins):** Generate **5-7** rapid-fire micro-steps.
    - **Medium Task / Medium Time (5-15 mins):** Generate **7-9** steps. Balanced flow.
    - **Chaotic Room / Long Time (> 15 mins):** Generate **10-12** steps. Deep clean logic.
 
 3. **Output Requirements:**
    - Generate unique, uplifting micro-steps.
-   - **CRITICAL:** For each micro-step, provide a \`completion_phrase\`.
-     - VARY THE TONE. Do not just say "Good job".
-     - Examples: "Visual noise neutralized.", "Excellent. Dopamine received.", "That corner is now breathing.", "Sector clear. Moving on."
-   - **SPEECH CUE:** Assign a \`speech_cue\` to each step based on the vibe of the action:
-     - 'urgent': Fast, punchy (e.g. for "Pick up trash").
-     - 'calm': Slow, soothing (e.g. for "Wipe surface").
-     - 'robotic': Monotone, factual (e.g. for "Sort items").
-     - 'cheerful': Higher pitch, happy (e.g. for "Done!").
-   - You MUST output strict JSON adhering to the provided schema.
-`;
+   - For each micro-step, provide a completion_phrase. VARY THE TONE.
+     Examples: "Visual noise neutralized.", "Excellent. Dopamine received.", "Sector clear. Moving on."
+   - Assign a speech_cue to each step: 'urgent', 'calm', 'robotic', or 'cheerful'.
+   - You MUST output ONLY valid JSON matching this exact schema — no markdown, no code fences:
 
-// Increase Vercel's default 1MB body limit — base64 images can be several MB.
-export const config = {
-  api: {
-    bodyParser: {
-      sizeLimit: '10mb',
-    },
-  },
-};
+{
+  "vibe_summary": "string (2-4 word punchy headline, e.g. CHAOS LEVEL: CRITICAL)",
+  "deep_think_log": "string (internal psychological analysis)",
+  "encouragement_phrase": "string (short robotic encouragement phrase)",
+  "micro_steps": [
+    {
+      "emoji": "string",
+      "action_verb": "string (punchy command)",
+      "time_estimate": "string (e.g. 10s, 30s)",
+      "reason": "string (why this step first)",
+      "completion_phrase": "string (context-aware compliment)",
+      "speech_cue": "urgent|calm|robotic|cheerful"
+    }
+  ]
+}
+`.trim();
 
-// We receive the image as a base64 string + mimeType from the client.
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (req.method !== "POST") {
     return res.status(405).json({ error: "Method not allowed" });
   }
 
-  const apiKey = process.env.GEMINI_API_KEY;
+  const apiKey = process.env.GROQ_API_KEY;
   if (!apiKey) {
-    return res
-      .status(500)
-      .json({ error: "Server misconfiguration: GEMINI_API_KEY is not set." });
+    return res.status(500).json({
+      error: "Server misconfiguration: GROQ_API_KEY is not set.",
+    });
   }
 
   try {
@@ -115,77 +72,74 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     };
 
     if (!base64Data || !mimeType || !timeAvailable) {
-      return res.status(400).json({ error: "Missing required fields: base64Data, mimeType, timeAvailable." });
+      return res.status(400).json({
+        error: "Missing required fields: base64Data, mimeType, timeAvailable.",
+      });
     }
 
-    const ai = new GoogleGenAI({ apiKey });
+    // Groq vision requires a data URL
+    const dataUrl = `data:${mimeType};base64,${base64Data}`;
 
-    const response = await ai.models.generateContent({
-      model: "gemini-2.5-flash",
-      contents: {
-        parts: [
-          {
-            inlineData: {
-              mimeType,
-              data: base64Data,
+    const groq = new Groq({ apiKey });
+
+    const completion = await groq.chat.completions.create({
+      model: "meta-llama/llama-4-scout-17b-16e-instruct",
+      messages: [
+        {
+          role: "system",
+          content: SYSTEM_PROMPT,
+        },
+        {
+          role: "user",
+          content: [
+            {
+              type: "image_url",
+              image_url: { url: dataUrl },
             },
-          },
-          {
-            text: `Analyze this chaos. Time available: ${timeAvailable}. Determine the step count and intensity based on this.`,
-          },
-        ],
-      },
-      config: {
-        systemInstruction: SYSTEM_INSTRUCTION,
-        responseMimeType: "application/json",
-        responseSchema: ZenStepSchema,
-      },
+            {
+              type: "text",
+              text: `Analyze this environment. Time available: ${timeAvailable}. Respond ONLY with valid JSON matching the schema in the system prompt.`,
+            },
+          ],
+        },
+      ],
+      temperature: 0.7,
+      max_tokens: 2048,
+      response_format: { type: "json_object" },
     });
 
-    const text = response.text;
+    const text = completion.choices[0]?.message?.content;
     if (!text) {
-      return res.status(500).json({ error: "No response from Gemini." });
+      return res.status(500).json({ error: "No response from Groq." });
     }
 
     const parsed = JSON.parse(text);
     return res.status(200).json(parsed);
   } catch (err: any) {
     console.error("[/api/analyze] Error:", err);
-    return res
-      .status(geminiHttpStatus(err))
-      .json({ error: geminiErrorMessage(err) });
+    return res.status(groqHttpStatus(err)).json({ error: groqErrorMessage(err) });
   }
 }
 
-// ── Gemini error helpers ──────────────────────────────────────────────────────
-function geminiHttpStatus(err: any): number {
-  try {
-    const body = typeof err.message === 'string' ? JSON.parse(err.message) : err;
-    const code = body?.error?.code ?? body?.code;
-    if (code === 429) return 429;
-    if (code === 400) return 400;
-    if (code === 403) return 403;
-  } catch {}
+// ── Error helpers ─────────────────────────────────────────────────────────────
+function groqHttpStatus(err: any): number {
+  const status = err?.status ?? err?.error?.status;
+  if (status === 429) return 429;
+  if (status === 400) return 400;
+  if (status === 401 || status === 403) return 403;
   return 500;
 }
 
-function geminiErrorMessage(err: any): string {
-  try {
-    const body = typeof err.message === 'string' ? JSON.parse(err.message) : err;
-    const code = body?.error?.code ?? body?.code;
-    const status = body?.error?.status ?? '';
-
-    if (code === 429 || status === 'RESOURCE_EXHAUSTED') {
-      return '⚠️ Gemini API quota exceeded. Your free-tier limit has been reached. Please enable billing on your Google AI project at https://aistudio.google.com — paid tier is very cheap (\$0.10 per image).';
-    }
-    if (code === 403) {
-      return '🔑 Invalid or missing Gemini API key. Check your GEMINI_API_KEY environment variable in the Vercel dashboard.';
-    }
-    if (code === 400) {
-      return '❌ Bad request sent to Gemini (unsupported file type or corrupted image). Please try a different photo.';
-    }
-    const msg = body?.error?.message;
-    if (msg) return msg;
-  } catch {}
-  return err.message || 'Internal server error.';
+function groqErrorMessage(err: any): string {
+  const status = err?.status ?? err?.error?.status;
+  if (status === 429) {
+    return "⚠️ Groq API rate limit hit. Free tier allows 1,000 requests/day. Please try again in a moment.";
+  }
+  if (status === 401 || status === 403) {
+    return "🔑 Invalid or missing Groq API key. Check your GROQ_API_KEY in the Vercel dashboard.";
+  }
+  if (status === 400) {
+    return "❌ Unsupported image format or file too large. Please try a JPEG/PNG under 4MB.";
+  }
+  return err?.error?.message ?? err?.message ?? "Internal server error.";
 }

@@ -1,16 +1,16 @@
 import type { VercelRequest, VercelResponse } from "@vercel/node";
-import { GoogleGenAI } from "@google/genai";
+import Groq from "groq-sdk";
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (req.method !== "POST") {
     return res.status(405).json({ error: "Method not allowed" });
   }
 
-  const apiKey = process.env.GEMINI_API_KEY;
+  const apiKey = process.env.GROQ_API_KEY;
   if (!apiKey) {
-    return res
-      .status(500)
-      .json({ error: "Server misconfiguration: GEMINI_API_KEY is not set." });
+    return res.status(500).json({
+      error: "Server misconfiguration: GROQ_API_KEY is not set.",
+    });
   }
 
   try {
@@ -23,55 +23,56 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       return res.status(400).json({ error: "Missing required field: message." });
     }
 
-    const ai = new GoogleGenAI({ apiKey });
+    const groq = new Groq({ apiKey });
 
-    const chat = ai.chats.create({
-      model: "gemini-2.5-flash",
-      history: history || [],
-      config: {
-        systemInstruction:
-          "You are ZenBot, a helpful, slightly robotic but friendly productivity assistant in the ZenStep app. Keep answers concise and motivating.",
-      },
+    // Convert ZenStep history format to Groq/OpenAI format
+    const groqHistory = (history || []).map((msg) => ({
+      role: msg.role as "user" | "assistant",
+      content: msg.parts?.[0]?.text ?? "",
+    }));
+
+    const completion = await groq.chat.completions.create({
+      model: "llama-3.3-70b-versatile",
+      messages: [
+        {
+          role: "system",
+          content:
+            "You are ZenBot, a helpful, slightly robotic but friendly productivity assistant inside the ZenStep app. Keep answers concise, punchy, and motivating. Max 2-3 sentences.",
+        },
+        ...groqHistory,
+        {
+          role: "user",
+          content: message,
+        },
+      ],
+      temperature: 0.75,
+      max_tokens: 256,
     });
 
-    const result = await chat.sendMessage({ message });
-    const text = result.text || "";
-
+    const text = completion.choices[0]?.message?.content ?? "";
     return res.status(200).json({ text });
   } catch (err: any) {
     console.error("[/api/chat] Error:", err);
-    return res
-      .status(geminiHttpStatus(err))
-      .json({ error: geminiErrorMessage(err) });
+    return res.status(groqHttpStatus(err)).json({ error: groqErrorMessage(err) });
   }
 }
 
-// ── Gemini error helpers ──────────────────────────────────────────────────────
-function geminiHttpStatus(err: any): number {
-  try {
-    const body = typeof err.message === 'string' ? JSON.parse(err.message) : err;
-    const code = body?.error?.code ?? body?.code;
-    if (code === 429) return 429;
-    if (code === 400) return 400;
-    if (code === 403) return 403;
-  } catch {}
+// ── Error helpers ─────────────────────────────────────────────────────────────
+function groqHttpStatus(err: any): number {
+  const status = err?.status ?? err?.error?.status;
+  if (status === 429) return 429;
+  if (status === 400) return 400;
+  if (status === 401 || status === 403) return 403;
   return 500;
 }
 
-function geminiErrorMessage(err: any): string {
-  try {
-    const body = typeof err.message === 'string' ? JSON.parse(err.message) : err;
-    const code = body?.error?.code ?? body?.code;
-    const status = body?.error?.status ?? '';
-
-    if (code === 429 || status === 'RESOURCE_EXHAUSTED') {
-      return '⚠️ Gemini API quota exceeded. Free-tier limit reached. Enable billing at https://aistudio.google.com to continue.';
-    }
-    if (code === 403) {
-      return '🔑 Invalid or missing Gemini API key. Check your GEMINI_API_KEY in Vercel dashboard.';
-    }
-    const msg = body?.error?.message;
-    if (msg) return msg;
-  } catch {}
-  return err.message || 'Internal server error.';
+function groqErrorMessage(err: any): string {
+  const status = err?.status ?? err?.error?.status;
+  if (status === 429) {
+    return "⚠️ Groq rate limit hit. Try again in a moment.";
+  }
+  if (status === 401 || status === 403) {
+    return "🔑 Invalid Groq API key. Check GROQ_API_KEY in Vercel.";
+  }
+  return err?.error?.message ?? err?.message ?? "Internal server error.";
 }
