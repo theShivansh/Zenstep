@@ -27,7 +27,7 @@ When individuals (particularly neurodivergent users or those with ADHD) face int
 *   **Multimodal Semantic Deconstruction:** Utilizes Groq's bleeding-edge `meta-llama/llama-4-scout-17b` vision model to parse complex environmental imagery (messy rooms, cluttered desks) into structured spatial data.
 *   **Dynamic Cognitive Load Balancing:** The LLM's system prompt acts as a "Productivity Psychologist." It dynamically adjusts the generated protocol based on two vectors: *Visual Entropy* (how messy the room is) and *Energy Commitment* (2m, 10m, or 30m). High chaos + low time = hyper-granular micro-steps.
 *   **Structured JSON Orchestration:** We enforce strict JSON schema adherence from the LLM to drive a programmatic, interactive UI. The AI doesn't output markdown text; it outputs a state machine of tasks, timestamps, emotional cues, and psychological analysis.
-*   **Contextual Agentic Assistant (ZenBot):** Powered by `llama-3.3-70b-versatile`, the integrated agent acts as a stateful, in-context motivational engine. It observes the user's progress through the generated protocol and provides adaptive encouragement.
+*   **Contextual Agentic Assistant (ZenBot):** Powered by `qwen/qwen3.6-27b`, the integrated agent acts as a stateful, in-context motivational engine. It observes the user's progress through the generated protocol and provides adaptive encouragement.
 *   **Synthesized Emotional TTS Cues:** The AI explicitly dictates the prosody and emotional tone of the Text-to-Speech (TTS) engine for every single micro-step (e.g., `urgent`, `calm`, `robotic`, `cheerful`), creating a uniquely tailored audio-visual feedback loop.
 
 ---
@@ -47,8 +47,8 @@ ZenStep is built for maximum speed and zero client-side payload leakage, utilizi
 *   **Frontend:** React 19 + TypeScript + Vite.
 *   **Styling:** Tailwind CSS (Custom Cyber-Brutalist Aesthetic).
 *   **Backend / API:** Vercel Serverless Functions (`@vercel/node`).
-*   **AI Engine (Vision):** Groq API (`meta-llama/llama-4-scout-17b-16e-instruct`).
-*   **AI Engine (Chat):** Groq API (`llama-3.3-70b-versatile`).
+*   **AI Engine (Vision):** Groq API (`qwen/qwen3.6-27b`).
+*   **AI Engine (Chat):** Groq API (`qwen/qwen3.6-27b`).
 
 ### 🔒 Security Highlight: Serverless AI Proxying
 The frontend **never** communicates directly with the AI provider. To protect API keys and prevent abuse, the React application posts Base64 payloads to highly optimized Vercel Serverless Functions (`/api/analyze`, `/api/chat`). These functions handle authentication, payload sanitization, strict error catching (429s, 400s), and communicate securely with the Groq API.
