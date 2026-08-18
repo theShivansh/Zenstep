@@ -24,7 +24,7 @@ When individuals (particularly neurodivergent users or those with ADHD) face int
 
 ### 🧠 Core Architectural Innovations
 
-*   **Multimodal Semantic Deconstruction:** Utilizes Groq's bleeding-edge `meta-llama/llama-4-scout-17b` vision model to parse complex environmental imagery (messy rooms, cluttered desks) into structured spatial data.
+*   **Multimodal Semantic Deconstruction:** Utilizes Groq's bleeding-edge `qwen/qwen3.6-27b` vision model to parse complex environmental imagery (messy rooms, cluttered desks) into structured spatial data.
 *   **Dynamic Cognitive Load Balancing:** The LLM's system prompt acts as a "Productivity Psychologist." It dynamically adjusts the generated protocol based on two vectors: *Visual Entropy* (how messy the room is) and *Energy Commitment* (2m, 10m, or 30m). High chaos + low time = hyper-granular micro-steps.
 *   **Structured JSON Orchestration:** We enforce strict JSON schema adherence from the LLM to drive a programmatic, interactive UI. The AI doesn't output markdown text; it outputs a state machine of tasks, timestamps, emotional cues, and psychological analysis.
 *   **Contextual Agentic Assistant (ZenBot):** Powered by `qwen/qwen3.6-27b`, the integrated agent acts as a stateful, in-context motivational engine. It observes the user's progress through the generated protocol and provides adaptive encouragement.
