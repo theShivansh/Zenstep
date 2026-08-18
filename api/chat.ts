@@ -32,7 +32,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     }));
 
     const completion = await groq.chat.completions.create({
-      model: "qwen/qwen3.6-27b",
+      model: "openai/gpt-oss-120b",
       messages: [
         {
           role: "system",
